@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "884996441303",
+    "project_id": "recibo-baa9a",
+    "storage_bucket": "recibo-baa9a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:884996441303:android:01814f7828c63b4fd21c92",
+        "android_client_info": {
+          "package_name": "com.example.recibo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAiYHkb_4lFs-Pq77M3zdSjLeWA16g7QFM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
