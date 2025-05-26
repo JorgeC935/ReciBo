@@ -21,8 +21,8 @@ import com.example.recibo.store.ui.StoreScreen
 import com.example.recibo.challenge.ui.ChallengeScreen
 import com.example.recibo.profile.ui.ProfileScreen
 
-@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     topBar = {
                         if (showBars && currentRoute in listOf("mainmenu", "store", "challenge", "profile")) {
-                            TopAppBar(
+                            CenterAlignedTopAppBar(
                                 title = { Text("ReciBo") },
                                 actions = {
                                     IconButton(onClick = { navController.navigate("store") }) {

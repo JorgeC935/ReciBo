@@ -4,31 +4,26 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonColors
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.recibo.R
-import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(onNavigateToMainMenu: () -> Unit, onNavigateToRegister: () -> Unit) {
     val viewModel: LoginViewModel = viewModel()
+
     Box(
         Modifier
             .fillMaxSize()
@@ -45,35 +40,95 @@ fun Login(
     onNavigateToMainMenu: () -> Unit,
     onNavigateToRegister: () -> Unit
 ) {
+    val email by viewModel.email.observeAsState("")
+    val password by viewModel.password.observeAsState("")
+    val loginEnable by viewModel.loginEnable.observeAsState(false)
+    val isLoading by viewModel.isLoading.observeAsState(false)
+    val loginResult by viewModel.loginResult.observeAsState()
 
-    val email :String by viewModel.email.observeAsState(initial = "")
-    val password :String by viewModel.password.observeAsState(initial = "")
-    val loginEnable :Boolean by viewModel.loginEnable.observeAsState(initial = false)
-    val isLoading :Boolean by viewModel.isLoading.observeAsState(initial = false)
-    val coroutineScope = rememberCoroutineScope()
+    // Manejo de resultados del login
+    LaunchedEffect(loginResult) {
+        when (loginResult) {
+            is LoginViewModel.LoginResult.Success -> {
+                onNavigateToMainMenu()
+            }
+            is LoginViewModel.LoginResult.EmailNotVerified -> {
+                // Se maneja en la UI más abajo
+            }
+            is LoginViewModel.LoginResult.VerificationEmailSent -> {
+                // Se maneja en la UI más abajo
+            }
+            is LoginViewModel.LoginResult.Error -> {
+                // Se maneja en la UI más abajo
+            }
+            null -> { /* No hacer nada */ }
+        }
+    }
 
-    if(isLoading){
-        Box(Modifier.fillMaxSize()){
+    if (isLoading) {
+        Box(Modifier.fillMaxSize()) {
             CircularProgressIndicator(Modifier.align(Alignment.Center))
         }
-    }else{
-        Column(modifier = Modifier) {
-            Spacer(modifier = Modifier.padding(8.dp))
+    } else {
+        Column(modifier = modifier) {
             HeaderImage(Modifier.align(Alignment.CenterHorizontally))
-            Spacer(modifier = Modifier.padding(16.dp))
-            EmailField(email, {viewModel.onLoginChanged(it, password)})
-            Spacer(modifier = Modifier.padding(4.dp))
-            PasswordField(password, {viewModel.onLoginChanged(email, it)})
-            Spacer(modifier = Modifier.padding(8.dp))
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "Bienvenido",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Text(
+                text = "Inicia sesión en tu cuenta",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            EmailField(email) { newEmail ->
+                viewModel.onLoginChanged(newEmail, password)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            PasswordField(password) { newPassword ->
+                viewModel.onLoginChanged(email, newPassword)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             DontHaveAccount(
                 Modifier.align(Alignment.End),
                 onNavigateToRegister
             )
-            Spacer(modifier = Modifier.padding(16.dp))
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             LoginButton(loginEnable) {
-                coroutineScope.launch {
-                    viewModel.onLoginSelected()
-                    onNavigateToMainMenu()
+                viewModel.onLoginSelected()
+            }
+
+            // Manejo de diferentes estados del resultado
+            loginResult?.let { result ->
+                Spacer(modifier = Modifier.height(16.dp))
+
+                when (result) {
+                    is LoginViewModel.LoginResult.Error -> {
+                        ErrorCard(result.message)
+                    }
+                    is LoginViewModel.LoginResult.EmailNotVerified -> {
+                        EmailNotVerifiedCard {
+                            viewModel.resendVerificationEmail()
+                        }
+                    }
+                    is LoginViewModel.LoginResult.VerificationEmailSent -> {
+                        SuccessCard("Email de verificación enviado. Revisa tu bandeja de entrada.")
+                    }
+                    else -> { /* No mostrar nada para Success */ }
                 }
             }
         }
@@ -84,57 +139,47 @@ fun Login(
 fun HeaderImage(modifier: Modifier) {
     Image(
         painter = painterResource(id = R.drawable.logo_principal),
-        contentDescription = "Header",
-        modifier = modifier
+        contentDescription = "Logo",
+        modifier = modifier.size(120.dp)
     )
 }
 
 @Composable
-fun EmailField(email: String, onTextFieldChanged:(String) -> Unit) {
-    TextField(
+fun EmailField(email: String, onTextFieldChanged: (String) -> Unit) {
+    OutlinedTextField(
         value = email,
-        onValueChange = { onTextFieldChanged(it) } ,
+        onValueChange = { onTextFieldChanged(it) },
         modifier = Modifier.fillMaxWidth(),
-        placeholder = { Text(text = "Email") },
+        label = { Text("Email") },
+        placeholder = { Text("ejemplo@correo.com") },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
         singleLine = true,
-        maxLines = 1,
-        colors = TextFieldDefaults.colors(
-            focusedTextColor = Color.DarkGray,
-            focusedContainerColor = Color.LightGray,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent
-        )
+        maxLines = 1
     )
 }
 
 @Composable
-fun PasswordField(password: String, onTextFieldChanged:(String) -> Unit) {
-    TextField(
+fun PasswordField(password: String, onTextFieldChanged: (String) -> Unit) {
+    OutlinedTextField(
         value = password,
         onValueChange = { onTextFieldChanged(it) },
         modifier = Modifier.fillMaxWidth(),
-        placeholder = { Text(text = "Contraseña") },
+        label = { Text("Contraseña") },
+        placeholder = { Text("Tu contraseña") },
+        visualTransformation = PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         singleLine = true,
-        maxLines = 1,
-        colors = TextFieldDefaults.colors(
-            focusedTextColor = Color.DarkGray,
-            focusedContainerColor = Color.LightGray,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent
-        )
+        maxLines = 1
     )
 }
 
 @Composable
 fun DontHaveAccount(modifier: Modifier, onNavigateToRegister: () -> Unit) {
     Text(
-        text = "¿No tienes cuenta?",
+        text = "¿No tienes cuenta? Regístrate",
         modifier = modifier.clickable { onNavigateToRegister() },
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Bold,
-        color = Color.DarkGray
+        fontSize = 14.sp,
+        color = MaterialTheme.colorScheme.primary
     )
 }
 
@@ -144,15 +189,80 @@ fun LoginButton(loginEnable: Boolean, onLoginSelected: () -> Unit) {
         onClick = { onLoginSelected() },
         modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp),
-        colors = ButtonColors(
-            containerColor = Color.Green,
-            disabledContainerColor = Color.LightGray,
-            contentColor = Color.Black,
-            disabledContentColor = Color.Black
-        ),
+            .height(50.dp),
         enabled = loginEnable
     ) {
-        Text(text = "Iniciar Sesión")
+        Text(
+            text = "Iniciar Sesión",
+            fontSize = 16.sp
+        )
+    }
+}
+
+@Composable
+fun ErrorCard(message: String) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Red.copy(alpha = 0.1f)
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = "❌ $message",
+            color = Color.Red,
+            modifier = Modifier.padding(16.dp),
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun EmailNotVerifiedCard(onResendEmail: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFFFC107).copy(alpha = 0.1f)
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "⚠️ Email no verificado",
+                color = Color(0xFFF57C00),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Necesitas verificar tu email antes de continuar",
+                color = Color(0xFFF57C00),
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            TextButton(onClick = onResendEmail) {
+                Text("Reenviar email de verificación")
+            }
+        }
+    }
+}
+
+@Composable
+fun SuccessCard(message: String) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Green.copy(alpha = 0.1f)
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = "✅ $message",
+            color = Color.Green,
+            modifier = Modifier.padding(16.dp),
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center
+        )
     }
 }
