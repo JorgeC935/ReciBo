@@ -83,4 +83,22 @@ dependencies {
     // Permisos de cámara
     implementation ("com.google.accompanist:accompanist-permissions:0.32.0")
 
+
+    // Firebase BOM - garantiza versiones compatibles
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+
+    // Firebase Authentication
+    implementation ("com.google.firebase:firebase-auth-ktx")
+
+    // Coroutines para Firebase
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
 }
+
+buildscript {
+    dependencies {
+        // Google Services plugin
+        classpath ("com.google.gms:google-services:4.4.0")
+    }
+}
+
