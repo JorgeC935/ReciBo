@@ -111,7 +111,6 @@ class LoginViewModel : ViewModel() {
     }
 
     private fun isEmailVerificationRequired(): Boolean {
-        // Puedes cambiar esto a true si quieres requerir verificación de email
         return false
     }
 

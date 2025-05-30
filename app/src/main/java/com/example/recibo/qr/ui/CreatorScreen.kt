@@ -12,6 +12,6 @@ fun CreatorScreen(onBack: () -> Unit) {
         Button(onClick = onBack) {
             Text("Volver")
         }
-        Text("Creador QR aquí", modifier = Modifier.fillMaxSize())
+        Text("Creador QR", modifier = Modifier.fillMaxSize())
     }
 }

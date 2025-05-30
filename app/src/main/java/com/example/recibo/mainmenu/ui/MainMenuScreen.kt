@@ -16,7 +16,7 @@ fun MainMenuScreen() {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "¡Bienvenido al Menú Principal!",
+            text = "¡Bienvenido a ReciBo!",
             fontSize = 24.sp,
             color = Color.Black
         )

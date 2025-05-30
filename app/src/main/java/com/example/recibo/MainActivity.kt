@@ -31,7 +31,6 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 var showBars by remember { mutableStateOf(true) }
 
-                // Observar cambios de ruta correctamente
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
 

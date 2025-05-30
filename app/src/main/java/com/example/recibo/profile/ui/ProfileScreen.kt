@@ -1,5 +1,12 @@
 package com.example.recibo.profile.ui
 
+import androidx.compose.runtime.Composable
+
+@Composable
+fun ProfileScreen() {
+}
+
+/*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -232,3 +239,6 @@ fun ProfileHeader(
 fun UserStats(user: com.example.recibo.user.data.User) {
     Card(
         modifier = Modifier.fillMaxWidth
+
+
+ */

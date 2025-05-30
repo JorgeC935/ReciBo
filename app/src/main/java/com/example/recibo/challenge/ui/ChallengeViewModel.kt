@@ -1,26 +1,26 @@
-package com.example.recibo.store.ui
+package com.example.recibo.challenge.ui
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.recibo.store.data.StoreItem
+import com.example.recibo.challenge.data.Challenge
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-class StoreViewModel : ViewModel() {
+class ChallengeViewModel : ViewModel() {
 
     private val firestore = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    private var storeItemsListener: ListenerRegistration? = null
+    private var challengesListener: ListenerRegistration? = null
     private var userPointsListener: ListenerRegistration? = null
 
-    private val _storeItems = MutableLiveData<List<StoreItem>>()
-    val storeItems: LiveData<List<StoreItem>> = _storeItems
+    private val _challenges = MutableLiveData<List<Challenge>>()
+    val challenges: LiveData<List<Challenge>> = _challenges
 
     private val _userPoints = MutableLiveData<Int>()
     val userPoints: LiveData<Int> = _userPoints
@@ -31,18 +31,18 @@ class StoreViewModel : ViewModel() {
     private val _purchaseResult = MutableLiveData<PurchaseResult?>()
     val purchaseResult: LiveData<PurchaseResult?> = _purchaseResult
 
-    private val _purchaseConfirmation = MutableLiveData<StoreItem?>()
-    val purchaseConfirmation: LiveData<StoreItem?> = _purchaseConfirmation
+    private val _purchaseConfirmation = MutableLiveData<Challenge?>()
+    val purchaseConfirmation: LiveData<Challenge?> = _purchaseConfirmation
 
     init {
-        loadStoreItems()
+        loadChallenges()
         loadUserPoints()
     }
 
-    private fun loadStoreItems() {
+    private fun loadChallenges() {
         _isLoading.value = true
 
-        storeItemsListener = firestore.collection("store_items")
+        challengesListener = firestore.collection("challenges")
             .whereEqualTo("isAvailable", true)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
@@ -52,9 +52,9 @@ class StoreViewModel : ViewModel() {
 
                 snapshot?.let { querySnapshot ->
                     val items = querySnapshot.documents.mapNotNull { document ->
-                        document.toObject(StoreItem::class.java)?.copy(id = document.id)
+                        document.toObject(Challenge::class.java)?.copy(id = document.id)
                     }
-                    _storeItems.value = items
+                    _challenges.value = items
                     _isLoading.value = false
                 }
             }
@@ -78,7 +78,7 @@ class StoreViewModel : ViewModel() {
             }
     }
 
-    fun showPurchaseConfirmation(item: StoreItem) {
+    fun showPurchaseConfirmation(item: Challenge) {
         _purchaseConfirmation.value = item
     }
 
@@ -86,10 +86,10 @@ class StoreViewModel : ViewModel() {
         _purchaseConfirmation.value = null
     }
 
-    fun purchaseItem(item: StoreItem) {
+    fun purchaseItem(item: Challenge) {
         val currentPoints = _userPoints.value ?: 0
 
-        if (currentPoints < item.price) {
+        if (currentPoints < item.requiredPoints) {
             _purchaseResult.value = PurchaseResult.InsufficientPoints
             return
         }
@@ -101,7 +101,7 @@ class StoreViewModel : ViewModel() {
                 // Actualizar puntos del usuario
                 val currentUser = auth.currentUser
                 val documentId = currentUser?.uid ?: "global_points"
-                val newPoints = currentPoints - item.price
+                val newPoints = currentPoints - item.requiredPoints
 
                 firestore.collection("user_points")
                     .document(documentId)
@@ -113,7 +113,7 @@ class StoreViewModel : ViewModel() {
                     "userId" to (currentUser?.uid ?: "anonymous"),
                     "itemId" to item.id,
                     "itemName" to item.name,
-                    "price" to item.price,
+                    "requiredPoints" to item.requiredPoints,
                     "purchaseDate" to com.google.firebase.Timestamp.now()
                 )
 
@@ -137,14 +137,14 @@ class StoreViewModel : ViewModel() {
     }
 
 
-    fun canAffordItem(item: StoreItem): Boolean {
-        return (_userPoints.value ?: 0) >= item.price
+    fun canAffordItem(item: Challenge): Boolean {
+        return (_userPoints.value ?: 0) >= item.requiredPoints
     }
 
-    fun getMissingPoints(item: StoreItem): Int {
+    fun getMissingPoints(item: Challenge): Int {
         val currentPoints = _userPoints.value ?: 0
-        return if (currentPoints < item.price) {
-            item.price - currentPoints
+        return if (currentPoints < item.requiredPoints) {
+            item.requiredPoints - currentPoints
         } else {
             0
         }
@@ -152,7 +152,7 @@ class StoreViewModel : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
-        storeItemsListener?.remove()
+        challengesListener?.remove()
         userPointsListener?.remove()
     }
 
