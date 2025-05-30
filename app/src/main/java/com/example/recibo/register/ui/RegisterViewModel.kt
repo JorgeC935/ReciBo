@@ -7,12 +7,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
+import com.google.firebase.Timestamp
+import com.example.recibo.user.data.User
+import com.example.recibo.user.data.UserRepository
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 class RegisterViewModel : ViewModel() {
 
     private val auth = FirebaseAuth.getInstance()
+    private val userRepository = UserRepository()
 
     private val _name = MutableLiveData<String>()
     val name: LiveData<String> = _name
@@ -52,23 +56,56 @@ class RegisterViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // Crear usuario en Firebase Auth
+                // 1. Crear usuario en Firebase Auth
                 val authResult = auth.createUserWithEmailAndPassword(currentEmail, currentPassword).await()
 
-                // Actualizar perfil del usuario con el nombre
-                val user = authResult.user
-                user?.let {
+                // 2. Actualizar perfil del usuario con el nombre
+                val firebaseUser = authResult.user
+                firebaseUser?.let { user ->
                     val profileUpdates = UserProfileChangeRequest.Builder()
                         .setDisplayName(currentName)
                         .build()
 
-                    it.updateProfile(profileUpdates).await()
+                    user.updateProfile(profileUpdates).await()
 
-                    // Enviar email de verificación (opcional pero recomendado)
-                    it.sendEmailVerification().await()
+                    // 3. Crear documento en Firestore
+                    val userDocument = User(
+                        uid = user.uid,
+                        name = currentName,
+                        email = currentEmail,
+                        points = 0,
+                        level = 1,
+                        totalReceipts = 0,
+                        savedItems = emptyList(),
+                        achievements = emptyList(),
+                        createdAt = Timestamp.now(),
+                        lastLogin = Timestamp.now(),
+                        profileImageUrl = "",
+                        preferences = com.example.recibo.user.data.UserPreferences()
+                    )
+
+                    val firestoreResult = userRepository.createUser(userDocument)
+
+                    if (firestoreResult.isSuccess) {
+                        // 4. Enviar email de verificación (opcional)
+                        try {
+                            user.sendEmailVerification().await()
+                        } catch (e: Exception) {
+                            // Si falla el envío del email, no es crítico
+                            // Solo registrar el error pero continuar
+                        }
+
+                        _registerResult.value = RegisterResult.Success
+                    } else {
+                        // Si falla la creación en Firestore, eliminar el usuario de Auth
+                        user.delete().await()
+                        _registerResult.value = RegisterResult.Error(
+                            "Error al crear perfil de usuario: ${firestoreResult.exceptionOrNull()?.message}"
+                        )
+                    }
+                } ?: run {
+                    _registerResult.value = RegisterResult.Error("Error al crear usuario")
                 }
-
-                _registerResult.value = RegisterResult.Success
 
             } catch (e: Exception) {
                 _registerResult.value = RegisterResult.Error(getErrorMessage(e))
@@ -79,15 +116,17 @@ class RegisterViewModel : ViewModel() {
     }
 
     private fun getErrorMessage(exception: Exception): String {
-        return when (exception.message) {
-            "The email address is already in use by another account." ->
+        return when {
+            exception.message?.contains("email address is already in use") == true ->
                 "Este email ya está registrado"
-            "The given password is invalid." ->
+            exception.message?.contains("password is invalid") == true ->
                 "La contraseña no es válida"
-            "A network error (such as timeout, interrupted connection or unreachable host) has occurred." ->
+            exception.message?.contains("network error") == true ->
                 "Error de conexión. Verifica tu internet"
-            "The email address is badly formatted." ->
+            exception.message?.contains("email address is badly formatted") == true ->
                 "El formato del email no es válido"
+            exception.message?.contains("weak-password") == true ->
+                "La contraseña es muy débil. Debe tener al menos 6 caracteres"
             else -> "Error al crear la cuenta: ${exception.message}"
         }
     }

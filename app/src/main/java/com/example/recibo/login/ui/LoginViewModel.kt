@@ -6,12 +6,14 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import com.example.recibo.user.data.UserRepository
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 class LoginViewModel : ViewModel() {
 
     private val auth = FirebaseAuth.getInstance()
+    private val userRepository = UserRepository()
 
     private val _email = MutableLiveData<String>()
     val email: LiveData<String> = _email
@@ -52,6 +54,14 @@ class LoginViewModel : ViewModel() {
                 // Verificar si el usuario existe y está autenticado
                 authResult.user?.let { user ->
                     if (user.isEmailVerified || !isEmailVerificationRequired()) {
+                        // Actualizar último login en Firestore
+                        try {
+                            userRepository.updateLastLogin(user.uid)
+                        } catch (e: Exception) {
+                            // Si falla la actualización del último login, no es crítico
+                            // Solo continuar con el login
+                        }
+
                         _loginResult.value = LoginResult.Success
                     } else {
                         _loginResult.value = LoginResult.EmailNotVerified
@@ -88,6 +98,14 @@ class LoginViewModel : ViewModel() {
     private fun checkCurrentUser() {
         val currentUser = auth.currentUser
         if (currentUser != null && (currentUser.isEmailVerified || !isEmailVerificationRequired())) {
+            // Actualizar último login si el usuario ya está logueado
+            viewModelScope.launch {
+                try {
+                    userRepository.updateLastLogin(currentUser.uid)
+                } catch (e: Exception) {
+                    // Error no crítico
+                }
+            }
             _loginResult.value = LoginResult.Success
         }
     }
@@ -98,18 +116,18 @@ class LoginViewModel : ViewModel() {
     }
 
     private fun getErrorMessage(exception: Exception): String {
-        return when (exception.message) {
-            "There is no user record corresponding to this identifier. The user may have been deleted." ->
+        return when {
+            exception.message?.contains("no user record corresponding to this identifier") == true ->
                 "No existe una cuenta con este email"
-            "The password is invalid or the user does not have a password." ->
+            exception.message?.contains("password is invalid") == true ->
                 "Contraseña incorrecta"
-            "The user account has been disabled by an administrator." ->
+            exception.message?.contains("user account has been disabled") == true ->
                 "Esta cuenta ha sido deshabilitada"
-            "A network error (such as timeout, interrupted connection or unreachable host) has occurred." ->
+            exception.message?.contains("network error") == true ->
                 "Error de conexión. Verifica tu internet"
-            "The email address is badly formatted." ->
+            exception.message?.contains("email address is badly formatted") == true ->
                 "El formato del email no es válido"
-            "Access to this account has been temporarily disabled due to many failed login attempts." ->
+            exception.message?.contains("too many requests") == true ->
                 "Cuenta temporalmente bloqueada por muchos intentos fallidos"
             else -> "Error de inicio de sesión: ${exception.message}"
         }

@@ -57,6 +57,7 @@ dependencies {
     implementation(libs.firebase.auth)
 
     implementation (libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.firebase.firestore)
 
     // Dependencias de testing
     testImplementation(libs.junit)
