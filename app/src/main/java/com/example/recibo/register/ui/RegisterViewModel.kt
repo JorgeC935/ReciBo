@@ -9,6 +9,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.Timestamp
 import com.example.recibo.user.data.User
+import com.example.recibo.user.data.UserPreferences
 import com.example.recibo.user.data.UserRepository
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -66,9 +67,14 @@ class RegisterViewModel : ViewModel() {
                         .setDisplayName(currentName)
                         .build()
 
-                    user.updateProfile(profileUpdates).await()
+                    try {
+                        user.updateProfile(profileUpdates).await()
+                        user.reload().await() // Recargar el usuario para obtener los datos actualizados
+                    } catch (e: Exception) {
+                        // Si falla la actualización del perfil, continúa de todos modos
+                    }
 
-                    // 3. Crear documento en Firestore
+                    // 3. Crear documento en Firestore con el modelo actualizado
                     val userDocument = User(
                         uid = user.uid,
                         name = currentName,
@@ -76,12 +82,15 @@ class RegisterViewModel : ViewModel() {
                         points = 0,
                         level = 1,
                         totalReceipts = 0,
+                        totalPointsEarned = 0,
+                        itemsPurchased = emptyList(),
                         savedItems = emptyList(),
                         achievements = emptyList(),
+                        challengesCompleted = emptyList(),
                         createdAt = Timestamp.now(),
                         lastLogin = Timestamp.now(),
                         profileImageUrl = "",
-                        preferences = com.example.recibo.user.data.UserPreferences()
+                        preferences = UserPreferences()
                     )
 
                     val firestoreResult = userRepository.createUser(userDocument)
@@ -92,7 +101,6 @@ class RegisterViewModel : ViewModel() {
                             user.sendEmailVerification().await()
                         } catch (e: Exception) {
                             // Si falla el envío del email, no es crítico
-                            // Solo registrar el error pero continuar
                         }
 
                         _registerResult.value = RegisterResult.Success

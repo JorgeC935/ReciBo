@@ -44,7 +44,28 @@ class UserRepository {
 
     suspend fun updateUser(uid: String, updates: Map<String, Any>): Result<String> {
         return try {
-            usersCollection.document(uid).update(updates).await()
+            // Separar updates de campos anidados
+            val flatUpdates = mutableMapOf<String, Any>()
+            val nestedUpdates = mutableMapOf<String, Any>()
+
+            updates.forEach { (key, value) ->
+                if (key.contains(".")) {
+                    nestedUpdates[key] = value
+                } else {
+                    flatUpdates[key] = value
+                }
+            }
+
+            // Aplicar updates simples
+            if (flatUpdates.isNotEmpty()) {
+                usersCollection.document(uid).update(flatUpdates).await()
+            }
+
+            // Aplicar updates anidados
+            if (nestedUpdates.isNotEmpty()) {
+                usersCollection.document(uid).update(nestedUpdates).await()
+            }
+
             Result.success("Usuario actualizado exitosamente")
         } catch (e: Exception) {
             Result.failure(e)
@@ -108,6 +129,19 @@ class UserRepository {
         return try {
             usersCollection.document(uid).delete().await()
             Result.success("Usuario eliminado exitosamente")
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateTotalPointsEarned(uid: String, additionalPoints: Int): Result<String> {
+        return try {
+            val userDoc = usersCollection.document(uid).get().await()
+            val user = userDoc.toObject(User::class.java)
+            user?.let {
+                val newTotal = it.totalPointsEarned + additionalPoints
+                updateUser(uid, mapOf("totalPointsEarned" to newTotal))
+            } ?: Result.failure(Exception("Usuario no encontrado"))
         } catch (e: Exception) {
             Result.failure(e)
         }

@@ -1,7 +1,7 @@
 package com.example.recibo.qr.ui
 
 import android.Manifest
-import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -34,6 +34,8 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 fun ScannerScreen(onBack: () -> Unit) {
     val viewModel: ScannerViewModel = viewModel()
     val context = LocalContext.current
+    val scanResult by viewModel.scanResult.observeAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // Estados del ViewModel
     val scannedResult by viewModel.scannedResult.observeAsState("")
@@ -46,6 +48,37 @@ fun ScannerScreen(onBack: () -> Unit) {
     LaunchedEffect(Unit) {
         if (!cameraPermissionState.status.isGranted) {
             cameraPermissionState.launchPermissionRequest()
+        }
+    }
+
+    LaunchedEffect(scanResult) {
+        scanResult?.let { result ->
+            when (result) {
+                is ScannerViewModel.ScanResult.Success -> {
+                    // Mostrar mensaje de éxito
+                    // Aquí puedes agregar un snackbar o diálogo
+                }
+                is ScannerViewModel.ScanResult.Error -> {
+                    // Mostrar mensaje de error
+                    // Aquí puedes agregar un snackbar o diálogo
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(scanResult) {
+        scanResult?.let { result ->
+            when (result) {
+                is ScannerViewModel.ScanResult.Success -> {
+                    snackbarHostState.showSnackbar(
+                        "¡Éxito! Ganaste ${result.pointsEarned} puntos de ${result.creatorName}"
+                    )
+                }
+                is ScannerViewModel.ScanResult.Error -> {
+                    snackbarHostState.showSnackbar(result.message)
+                }
+            }
+            viewModel.clearScanResult()
         }
     }
 
@@ -236,6 +269,10 @@ fun ResultContent(
 fun CameraPreview(onQrScanned: (String) -> Unit) {
     var scanFlag by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) {
+        scanFlag = false
+    }
+
     Column {
         // Instrucciones
         Card(
@@ -266,11 +303,9 @@ fun CameraPreview(onQrScanned: (String) -> Unit) {
                         capture.decode()
                         this.setStatusText("")
                         this.decodeContinuous { result ->
-                            if (!scanFlag) {
+                            if (!scanFlag && result.text != null) {
                                 scanFlag = true
-                                result.text?.let { scannedText ->
-                                    onQrScanned(scannedText)
-                                }
+                                onQrScanned(result.text)
                             }
                         }
                         this.resume()

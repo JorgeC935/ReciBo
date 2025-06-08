@@ -1,5 +1,6 @@
 [versions]
 agp = "8.9.2"
+cameraCamera2 = "1.4.2"
 hiltAndroid = "2.51.1"
 hiltAndroidCompiler = "2.51.1"
 kotlin = "2.0.21"
@@ -19,6 +20,7 @@ navigationCompose = "2.7.7"
 firebaseFirestore = "25.1.4"
 
 [libraries]
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "cameraCamera2" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx-v251 = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtxVersion" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }

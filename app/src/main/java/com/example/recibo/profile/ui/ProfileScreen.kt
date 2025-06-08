@@ -1,12 +1,5 @@
 package com.example.recibo.profile.ui
 
-import androidx.compose.runtime.Composable
-
-@Composable
-fun ProfileScreen() {
-}
-
-/*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -28,18 +21,25 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(onNavigateToLogin: (() -> Unit)? = null) {
     val viewModel: ProfileViewModel = viewModel()
     val user by viewModel.user.observeAsState()
     val isLoading by viewModel.isLoading.observeAsState(false)
     val error by viewModel.error.observeAsState()
     val updateResult by viewModel.updateResult.observeAsState()
+    val logoutResult by viewModel.logoutResult.observeAsState()
 
     var showEditDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
 
-    // Snackbar para mostrar mensajes
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Manejar el logout
+    LaunchedEffect(logoutResult) {
+        if (logoutResult == true && onNavigateToLogin != null) {
+            onNavigateToLogin()
+        }
+    }
 
     LaunchedEffect(error) {
         error?.let {
@@ -88,19 +88,25 @@ fun ProfileScreen() {
                             onEditClick = { showEditDialog = true }
                         )
 
-                        // Estadísticas del usuario
-                        UserStats(user = currentUser)
+                        // Estadísticas principales
+                        UserMainStats(user = currentUser)
+
+                        // Estadísticas detalladas
+                        UserDetailedStats(user = currentUser)
 
                         // Información de la cuenta
                         AccountInfo(user = currentUser)
 
-                        // Configuraciones
+                        // Preferencias
                         UserPreferences(
                             user = currentUser,
                             onPreferencesChange = { notifications, darkMode ->
                                 viewModel.updatePreferences(notifications, darkMode)
                             }
                         )
+
+                        // Sección de logros
+                        AchievementsSection(user = currentUser)
 
                         // Botón de cerrar sesión
                         LogoutSection {
@@ -236,9 +242,312 @@ fun ProfileHeader(
 }
 
 @Composable
-fun UserStats(user: com.example.recibo.user.data.User) {
+fun UserMainStats(user: com.example.recibo.user.data.User) {
     Card(
-        modifier = Modifier.fillMaxWidth
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Estadísticas",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatItem("Puntos", user.points.toString())
+                StatItem("Nivel", user.level.toString())
+                StatItem("Recibos", user.totalReceipts.toString())
+            }
+        }
+    }
+}
 
- */
+@Composable
+fun UserDetailedStats(user: com.example.recibo.user.data.User) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Estadísticas Detalladas",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            DetailedStatRow("Puntos Totales Ganados", user.totalPointsEarned.toString())
+            DetailedStatRow("Items Comprados", user.itemsPurchased.size.toString())
+            DetailedStatRow("Items Guardados", user.savedItems.size.toString())
+            DetailedStatRow("Logros Obtenidos", user.achievements.size.toString())
+            DetailedStatRow("Desafíos Completados", user.challengesCompleted.size.toString())
+        }
+    }
+}
+
+@Composable
+fun DetailedStatRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+@Composable
+fun StatItem(label: String, value: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun AccountInfo(user: com.example.recibo.user.data.User) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Información de la Cuenta",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            InfoRow("Email", user.email)
+            InfoRow("Miembro desde", formatDate(user.createdAt.toDate()))
+            InfoRow("Último acceso", formatDate(user.lastLogin.toDate()))
+        }
+    }
+}
+
+@Composable
+fun InfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+fun UserPreferences(
+    user: com.example.recibo.user.data.User,
+    onPreferencesChange: (Boolean, Boolean) -> Unit
+) {
+    var notificationsEnabled by remember(user.preferences.notificationsEnabled) {
+        mutableStateOf(user.preferences.notificationsEnabled)
+    }
+    var darkMode by remember(user.preferences.darkMode) {
+        mutableStateOf(user.preferences.darkMode)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Preferencias",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Notificaciones")
+                Switch(
+                    checked = notificationsEnabled,
+                    onCheckedChange = {
+                        notificationsEnabled = it
+                        onPreferencesChange(it, darkMode)
+                    }
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Modo Oscuro")
+                Switch(
+                    checked = darkMode,
+                    onCheckedChange = {
+                        darkMode = it
+                        onPreferencesChange(notificationsEnabled, it)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AchievementsSection(user: com.example.recibo.user.data.User) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Logros Recientes",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            if (user.achievements.isEmpty()) {
+                Text(
+                    text = "¡Comienza a usar la app para desbloquear logros!",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                user.achievements.take(3).forEach { achievement ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.EmojiEvents,
+                            contentDescription = null,
+                            tint = Color(0xFFFFD700),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = achievement,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LogoutSection(onLogout: () -> Unit) {
+    Button(
+        onClick = onLogout,
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.error
+        )
+    ) {
+        Icon(Icons.Default.ExitToApp, contentDescription = null)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text("Cerrar Sesión")
+    }
+}
+
+@Composable
+fun EditNameDialog(
+    currentName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var name by remember { mutableStateOf(currentName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar Nombre") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nombre") },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (name.trim().length >= 2) {
+                        onConfirm(name.trim())
+                    }
+                },
+                enabled = name.trim().length >= 2
+            ) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+private fun formatDate(date: Date): String {
+    val formatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    return formatter.format(date)
+}

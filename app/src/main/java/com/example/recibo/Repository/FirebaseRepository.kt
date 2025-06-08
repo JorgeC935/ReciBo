@@ -1,5 +1,7 @@
 package com.example.recibo.Repository
 
+import com.example.recibo.user.data.User
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
@@ -21,6 +23,7 @@ class FirebaseRepository {
             val firebaseUser = authResult.user ?: throw Exception("Error al crear usuario")
 
             // Crear documento del usuario en Firestore
+            val currentTime = Timestamp.now()
             val user = User(
                 uid = firebaseUser.uid,
                 name = name,
@@ -30,8 +33,8 @@ class FirebaseRepository {
                 itemsPurchased = emptyList(),
                 challengesCompleted = emptyList(),
                 profileImageUrl = "",
-                createdAt = System.currentTimeMillis(),
-                lastLogin = System.currentTimeMillis()
+                createdAt = currentTime,
+                lastLogin = currentTime
             )
 
             // Guardar en Firestore
@@ -56,7 +59,7 @@ class FirebaseRepository {
             // Actualizar última conexión
             updateLastLogin(firebaseUser.uid)
 
-            Result.success(user.copy(lastLogin = System.currentTimeMillis()))
+            Result.success(user.copy(lastLogin = Timestamp.now()))
         } catch (e: Exception) {
             Result.failure(e)
         }

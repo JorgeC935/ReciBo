@@ -26,6 +26,9 @@ class ProfileViewModel : ViewModel() {
     private val _updateResult = MutableLiveData<String?>()
     val updateResult: LiveData<String?> = _updateResult
 
+    private val _logoutResult = MutableLiveData<Boolean>()
+    val logoutResult: LiveData<Boolean> = _logoutResult
+
     init {
         loadUserProfile()
     }
@@ -41,7 +44,8 @@ class ProfileViewModel : ViewModel() {
                         _user.value = result.getOrNull()
                         _error.value = null
                     } else {
-                        _error.value = "Error al cargar perfil: ${result.exceptionOrNull()?.message}"
+                        _error.value =
+                            "Error al cargar perfil: ${result.exceptionOrNull()?.message}"
                     }
                 } catch (e: Exception) {
                     _error.value = "Error al cargar perfil: ${e.message}"
@@ -51,6 +55,7 @@ class ProfileViewModel : ViewModel() {
             }
         } else {
             _error.value = "Usuario no autenticado"
+            _logoutResult.value = true
         }
     }
 
@@ -68,7 +73,8 @@ class ProfileViewModel : ViewModel() {
                         _updateResult.value = "Nombre actualizado correctamente"
                         loadUserProfile() // Recargar el perfil
                     } else {
-                        _error.value = "Error al actualizar nombre: ${result.exceptionOrNull()?.message}"
+                        _error.value =
+                            "Error al actualizar nombre: ${result.exceptionOrNull()?.message}"
                     }
                 } catch (e: Exception) {
                     _error.value = "Error al actualizar nombre: ${e.message}"
@@ -96,7 +102,8 @@ class ProfileViewModel : ViewModel() {
                         _updateResult.value = "Preferencias actualizadas"
                         loadUserProfile() // Recargar el perfil
                     } else {
-                        _error.value = "Error al actualizar preferencias: ${result.exceptionOrNull()?.message}"
+                        _error.value =
+                            "Error al actualizar preferencias: ${result.exceptionOrNull()?.message}"
                     }
                 } catch (e: Exception) {
                     _error.value = "Error al actualizar preferencias: ${e.message}"
@@ -110,6 +117,7 @@ class ProfileViewModel : ViewModel() {
     fun logout() {
         auth.signOut()
         _user.value = null
+        _logoutResult.value = true
     }
 
     fun clearMessages() {
@@ -124,5 +132,47 @@ class ProfileViewModel : ViewModel() {
             currentUser?.level ?: 1,
             currentUser?.totalReceipts ?: 0
         )
+    }
+
+    // Métodos adicionales para actualizar estadísticas
+    fun addPoints(points: Int) {
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            viewModelScope.launch {
+                try {
+                    val currentUserData = _user.value
+                    currentUserData?.let { userData ->
+                        val newPoints = userData.points + points
+                        val newTotalPoints = userData.totalPointsEarned + points
+                        val updates = mapOf(
+                            "points" to newPoints,
+                            "totalPointsEarned" to newTotalPoints
+                        )
+                        val result = userRepository.updateUser(currentUser.uid, updates)
+                        if (result.isSuccess) {
+                            loadUserProfile()
+                        }
+                    }
+                } catch (e: Exception) {
+                    _error.value = "Error al actualizar puntos: ${e.message}"
+                }
+            }
+        }
+    }
+
+    fun incrementReceipts() {
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            viewModelScope.launch {
+                try {
+                    val result = userRepository.incrementTotalReceipts(currentUser.uid)
+                    if (result.isSuccess) {
+                        loadUserProfile()
+                    }
+                } catch (e: Exception) {
+                    _error.value = "Error al actualizar recibos: ${e.message}"
+                }
+            }
+        }
     }
 }

@@ -3,6 +3,8 @@ package com.example.recibo.Auth
 // AuthViewModel.kt - ViewModel para manejar autenticación
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.recibo.Repository.FirebaseRepository
+import com.example.recibo.user.data.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -10,7 +12,8 @@ import kotlinx.coroutines.launch
 
 data class AuthState(
     val isLoading: Boolean = false,
-    val currentUser: User? = null,
+    val currentUser: User
+    ? = null,
     val isAuthenticated: Boolean = false,
     val error: String? = null
 )

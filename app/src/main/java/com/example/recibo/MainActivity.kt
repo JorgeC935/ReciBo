@@ -11,10 +11,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.*
+import com.example.recibo.ui.theme.ReciBoTheme
 import com.example.recibo.mainmenu.ui.MainMenuScreen
 import com.example.recibo.login.ui.LoginScreen
 import com.example.recibo.register.ui.RegisterScreen
-import com.example.recibo.ui.theme.ReciBoTheme
 import com.example.recibo.qr.ui.ScannerScreen
 import com.example.recibo.qr.ui.CreatorScreen
 import com.example.recibo.store.ui.StoreScreen
@@ -35,7 +35,11 @@ class MainActivity : ComponentActivity() {
                 val currentRoute = navBackStackEntry?.destination?.route
 
                 LaunchedEffect(currentRoute) {
-                    showBars = currentRoute !in listOf("login", "register", "scanner", "creator")
+                    showBars = when(currentRoute) {
+                        "login", "register" -> false
+                        "scanner", "creator" -> false // Barras ocultas para pantallas de QR
+                        else -> true
+                    }
                 }
 
                 Scaffold(
@@ -80,11 +84,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 ) { innerPadding ->
-                    NavHost(
-                        navController = navController,
-                        startDestination = "login",
-                        modifier = Modifier.padding(innerPadding)
-                    ) {
+                    NavHost(navController = navController, startDestination = "login", modifier = Modifier.padding(innerPadding)) {
                         composable("login") {
                             LoginScreen(
                                 onNavigateToMainMenu = {
@@ -101,7 +101,15 @@ class MainActivity : ComponentActivity() {
                         composable("mainmenu") { MainMenuScreen() }
                         composable("store") { StoreScreen() }
                         composable("challenge") { ChallengeScreen() }
-                        composable("profile") { ProfileScreen() }
+                        composable("profile") {
+                            ProfileScreen(
+                                onNavigateToLogin = {
+                                    navController.navigate("login") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
                         composable("scanner") {
                             ScannerScreen { navController.popBackStack() }
                         }
