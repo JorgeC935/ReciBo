@@ -18,10 +18,51 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.example.recibo.R
 import com.example.recibo.store.data.StoreItem
 
 @Composable
 fun StoreScreen() {
+
+    val compositionResult by rememberLottieComposition(
+        spec = LottieCompositionSpec.RawRes(R.raw.tienda)
+    )
+
+    val progress by animateLottieCompositionAsState(
+        composition = compositionResult,
+        iterations = LottieConstants.IterateForever,
+        isPlaying = true,
+        speed = 1f,
+        restartOnPlay = false
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Top // Cambiado de Center a Top
+    ) {
+        // Espaciado desde arriba
+        Spacer(modifier = Modifier.height(270.dp))
+
+        // Animación Lottie
+        LottieAnimation(
+            composition = compositionResult,
+            progress = { progress },
+            modifier = Modifier
+                .size(200.dp)
+                .padding(bottom = 24.dp)
+        )
+
+
+    }
+
     val viewModel: StoreViewModel = viewModel()
 
     val storeItems by viewModel.storeItems.observeAsState(emptyList())

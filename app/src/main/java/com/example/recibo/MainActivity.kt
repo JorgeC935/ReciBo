@@ -104,7 +104,17 @@ class MainActivity : ComponentActivity() {
                         composable("register") {
                             RegisterScreen { navController.navigate("login") }
                         }
-                        composable("mainmenu") { MainMenuScreen() }
+                        // En tu MainActivity.kt, actualiza esta parte del NavHost:
+
+                        composable("mainmenu") {
+                            MainMenuScreen(
+                                onNavigateToScanner = { navController.navigate("scanner") },
+                                onNavigateToCreator = { navController.navigate("creator") },
+                                onNavigateToStore = { navController.navigate("store") },
+                                onNavigateToAchievements = { navController.navigate("achievement") },
+                                onNavigateToProfile = { navController.navigate("profile") }
+                            )
+                        }
                         composable("store") { StoreScreen() }
                         composable("achievement") { AchievementScreen() }
                         composable("profile") {
