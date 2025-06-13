@@ -17,11 +17,53 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.example.recibo.R
 import com.example.recibo.achievement.data.Achievement
 import com.example.recibo.achievement.data.UserAchievement
 
 @Composable
 fun AchievementScreen() {
+    val compositionResult by rememberLottieComposition(
+        spec = LottieCompositionSpec.RawRes(R.raw.welcome_animation)
+    )
+
+    val progress by animateLottieCompositionAsState(
+        composition = compositionResult,
+        iterations = LottieConstants.IterateForever,
+        isPlaying = true,
+        speed = 1f,
+        restartOnPlay = false
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Top // Cambiado de Center a Top
+    ) {
+        // Espaciado desde arriba
+        Spacer(modifier = Modifier.height(270.dp))
+
+        // Animación Lottie
+        LottieAnimation(
+            composition = compositionResult,
+            progress = { progress },
+            modifier = Modifier
+                .size(200.dp)
+                .padding(bottom = 24.dp)
+        )
+
+
+    }
+
+
+
     val viewModel: AchievementViewModel = viewModel()
 
     val achievements by viewModel.achievements.observeAsState(emptyList())

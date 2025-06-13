@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 
 class AchievementViewModel : ViewModel() {
 
+
     private val auth = FirebaseAuth.getInstance()
     private val achievementRepository = AchievementRepository()
     private val userRepository = UserRepository()
