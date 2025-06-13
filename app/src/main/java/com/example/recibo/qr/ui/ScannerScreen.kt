@@ -31,7 +31,10 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun ScannerScreen(onBack: () -> Unit) {
+fun ScannerScreen(
+    onNavigateToResult: (Int, String) -> Unit, // Cambiar parámetros
+    onBack: () -> Unit
+) {
     val viewModel: ScannerViewModel = viewModel()
     val context = LocalContext.current
     val scanResult by viewModel.scanResult.observeAsState()
@@ -45,34 +48,11 @@ fun ScannerScreen(onBack: () -> Unit) {
     // Permisos de cámara
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
 
-    LaunchedEffect(Unit) {
-        if (!cameraPermissionState.status.isGranted) {
-            cameraPermissionState.launchPermissionRequest()
-        }
-    }
-
     LaunchedEffect(scanResult) {
         scanResult?.let { result ->
             when (result) {
                 is ScannerViewModel.ScanResult.Success -> {
-                    // Mostrar mensaje de éxito
-                    // Aquí puedes agregar un snackbar o diálogo
-                }
-                is ScannerViewModel.ScanResult.Error -> {
-                    // Mostrar mensaje de error
-                    // Aquí puedes agregar un snackbar o diálogo
-                }
-            }
-        }
-    }
-
-    LaunchedEffect(scanResult) {
-        scanResult?.let { result ->
-            when (result) {
-                is ScannerViewModel.ScanResult.Success -> {
-                    snackbarHostState.showSnackbar(
-                        "¡Éxito! Ganaste ${result.pointsEarned} puntos de ${result.creatorName}"
-                    )
+                    onNavigateToResult(result.pointsEarned, result.creatorName)
                 }
                 is ScannerViewModel.ScanResult.Error -> {
                     snackbarHostState.showSnackbar(result.message)
@@ -87,7 +67,6 @@ fun ScannerScreen(onBack: () -> Unit) {
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // Top Bar personalizada
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -144,6 +123,14 @@ fun ScannerScreen(onBack: () -> Unit) {
                 )
             }
         }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
+
     }
 }
 
@@ -298,17 +285,16 @@ fun CameraPreview(onQrScanned: (String) -> Unit) {
             AndroidView(
                 factory = { context ->
                     CompoundBarcodeView(context).apply {
-                        val capture = CaptureManager(context as androidx.activity.ComponentActivity, this)
-                        capture.initializeFromIntent(context.intent, null)
-                        capture.decode()
+                        // Configuración básica sin CaptureManager
                         this.setStatusText("")
                         this.decodeContinuous { result ->
-                            if (!scanFlag && result.text != null) {
+                            if (!scanFlag && result.text != null && result.text.isNotEmpty()) {
                                 scanFlag = true
+                                this.pause()
                                 onQrScanned(result.text)
                             }
                         }
-                        this.resume()
+                        this.resume() // Iniciar directamente
                     }
                 },
                 modifier = Modifier.fillMaxSize()

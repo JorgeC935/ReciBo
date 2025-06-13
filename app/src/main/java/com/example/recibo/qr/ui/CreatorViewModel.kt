@@ -74,6 +74,7 @@ class CreatorViewModel : ViewModel() {
         }
     }
 
+
     fun generateQR(points: Int, isSingleUse: Boolean) {
         val currentUser = auth.currentUser
         if (currentUser == null) {
@@ -92,7 +93,7 @@ class CreatorViewModel : ViewModel() {
             return
         }
 
-        if (points > 500) { // Límite máximo opcional
+        if (points > 500) {
             _error.value = "No puedes asignar más de 500 puntos por QR"
             return
         }
@@ -110,6 +111,7 @@ class CreatorViewModel : ViewModel() {
 
                 // Crear objeto QRCode
                 val qrCode = QRCode(
+                    id = qrId,  // Asignar ID desde el inicio
                     creatorId = currentUser.uid,
                     creatorName = userName,
                     points = points,
@@ -118,30 +120,19 @@ class CreatorViewModel : ViewModel() {
                 )
 
                 // Guardar en Firestore
-                val qrCodeWithId = qrCode.copy(id = qrId)
-                val createResult = qrCodeRepository.createQRCodeWithId(qrCodeWithId, qrId)
+                val createResult = qrCodeRepository.createQRCodeWithId(qrCode, qrId)
                 if (createResult.isSuccess) {
-                    // Descontar puntos del usuario
-                    val newPoints = currentPoints - points
-                    val updateResult = userRepository.updateUserPoints(currentUser.uid, newPoints)
+                    // NO descontamos los puntos aquí - se descuentan cuando alguien escanea
+                    // Generar bitmap del QR
+                    val bitmap = generateQRBitmap(qrContent, 512, 512)
 
-                    if (updateResult.isSuccess) {
-                        // Generar bitmap del QR
-                        val bitmap = generateQRBitmap(qrContent, 512, 512)
-
-                        _generatedQR.value = GeneratedQRResult(
-                            qrCode = qrCode.copy(id = createResult.getOrNull() ?: ""),
-                            bitmap = bitmap,
-                            qrContent = qrContent
-                        )
-                        _userPoints.value = newPoints
-                        _success.value = "QR generado exitosamente"
-                        loadUserQRCodes()
-                    } else {
-                        _error.value = "Error al descontar puntos"
-                    }
-                } else {
-                    _error.value = "Error al crear QR: ${createResult.exceptionOrNull()?.message}"
+                    _generatedQR.value = GeneratedQRResult(
+                        qrCode = qrCode,
+                        bitmap = bitmap,
+                        qrContent = qrContent
+                    )
+                    _success.value = "QR generado exitosamente"
+                    loadUserQRCodes()
                 }
             } catch (e: Exception) {
                 _error.value = "Error: ${e.message}"
@@ -151,23 +142,27 @@ class CreatorViewModel : ViewModel() {
         }
     }
 
+    // REEMPLAZAR el método cancelQR en CreatorViewModel.kt:
+
     fun cancelQR(qrCode: QRCode) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // Desactivar QR
-                val result = qrCodeRepository.deactivateQRCode(qrCode.id)
-                if (result.isSuccess) {
-                    // Devolver puntos al usuario
-                    val currentPoints = _userPoints.value ?: 0
-                    val newPoints = currentPoints + qrCode.points
-                    val updateResult = userRepository.updateUserPoints(auth.currentUser?.uid ?: "", newPoints)
+                // Solo se puede cancelar si no ha sido escaneado
+                if (qrCode.scannedBy != null) {
+                    _error.value = "No se puede cancelar un QR que ya fue escaneado"
+                    _isLoading.value = false
+                    return@launch
+                }
 
-                    if (updateResult.isSuccess) {
-                        _userPoints.value = newPoints
-                        _success.value = "QR cancelado y puntos devueltos"
-                        loadUserQRCodes()
-                    }
+                // Usar la nueva función que devuelve puntos
+                val result = qrCodeRepository.cancelQRCodeAndRefund(qrCode, userRepository)
+                if (result.isSuccess) {
+                    _success.value = "QR cancelado y puntos devueltos exitosamente"
+                    loadUserQRCodes()
+                    loadUserPoints() // Recargar puntos actualizados
+                } else {
+                    _error.value = "Error al cancelar QR: ${result.exceptionOrNull()?.message}"
                 }
             } catch (e: Exception) {
                 _error.value = "Error al cancelar QR: ${e.message}"
@@ -175,19 +170,6 @@ class CreatorViewModel : ViewModel() {
                 _isLoading.value = false
             }
         }
-    }
-
-    private fun generateQRBitmap(content: String, width: Int, height: Int): Bitmap {
-        val writer = QRCodeWriter()
-        val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, width, height)
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
-
-        for (x in 0 until width) {
-            for (y in 0 until height) {
-                bitmap.setPixel(x, y, if (bitMatrix[x, y]) Color.BLACK else Color.WHITE)
-            }
-        }
-        return bitmap
     }
 
     fun clearMessages() {
@@ -204,4 +186,17 @@ class CreatorViewModel : ViewModel() {
         val bitmap: Bitmap,
         val qrContent: String
     )
+
+    private fun generateQRBitmap(content: String, width: Int, height: Int): Bitmap {
+        val writer = QRCodeWriter()
+        val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, width, height)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+
+        for (x in 0 until width) {
+            for (y in 0 until height) {
+                bitmap.setPixel(x, y, if (bitMatrix[x, y]) Color.BLACK else Color.WHITE)
+            }
+        }
+        return bitmap
+    }
 }

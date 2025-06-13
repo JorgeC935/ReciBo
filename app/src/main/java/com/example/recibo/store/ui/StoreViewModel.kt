@@ -5,11 +5,13 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.recibo.store.data.StoreItem
+import com.example.recibo.user.data.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import com.google.firebase.Timestamp
 
 class StoreViewModel : ViewModel() {
 
@@ -34,9 +36,13 @@ class StoreViewModel : ViewModel() {
     private val _purchaseConfirmation = MutableLiveData<StoreItem?>()
     val purchaseConfirmation: LiveData<StoreItem?> = _purchaseConfirmation
 
+    private val _currentUser = MutableLiveData<User?>()
+    val currentUser: LiveData<User?> = _currentUser
+
     init {
         loadStoreItems()
         loadUserPoints()
+        loadCurrentUser()
     }
 
     private fun loadStoreItems() {
@@ -61,21 +67,31 @@ class StoreViewModel : ViewModel() {
     }
 
     private fun loadUserPoints() {
-        // Por ahora usamos un documento global de puntos
-        // En el futuro, esto cambiará para usar el UID del usuario
         val currentUser = auth.currentUser
-        val documentId = currentUser?.uid ?: "global_points"
-
-        userPointsListener = firestore.collection("user_points")
-            .document(documentId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    return@addSnapshotListener
+        if (currentUser != null) {
+            userPointsListener = firestore.collection("users")
+                .document(currentUser.uid)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        return@addSnapshotListener
+                    }
+                    val points = snapshot?.getLong("points")?.toInt() ?: 0
+                    _userPoints.value = points
                 }
+        }
+    }
 
-                val points = snapshot?.getLong("points")?.toInt() ?: 0
-                _userPoints.value = points
-            }
+    private fun loadCurrentUser() {
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            firestore.collection("users")
+                .document(currentUser.uid)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) return@addSnapshotListener
+                    val user = snapshot?.toObject(User::class.java)
+                    _currentUser.value = user
+                }
+        }
     }
 
     fun showPurchaseConfirmation(item: StoreItem) {
@@ -97,35 +113,50 @@ class StoreViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 _isLoading.value = true
+                val currentUser = auth.currentUser ?: return@launch
 
-                // Actualizar puntos del usuario
-                val currentUser = auth.currentUser
-                val documentId = currentUser?.uid ?: "global_points"
-                val newPoints = currentPoints - item.price
+                // Usar transacción para garantizar consistencia
+                firestore.runTransaction { transaction ->
+                    val userRef = firestore.collection("users").document(currentUser.uid)
+                    val userSnapshot = transaction.get(userRef)
 
-                firestore.collection("user_points")
-                    .document(documentId)
-                    .update("points", newPoints)
-                    .await()
+                    val currentUserPoints = userSnapshot.getLong("points")?.toInt() ?: 0
+                    val currentItemsPurchased = userSnapshot.get("itemsPurchased") as? List<String> ?: emptyList()
 
-                // Registrar la compra (opcional, para historial)
-                val purchase = hashMapOf(
-                    "userId" to (currentUser?.uid ?: "anonymous"),
-                    "itemId" to item.id,
-                    "itemName" to item.name,
-                    "price" to item.price,
-                    "purchaseDate" to com.google.firebase.Timestamp.now()
-                )
+                    if (currentUserPoints < item.price) {
+                        throw Exception("Puntos insuficientes")
+                    }
 
-                firestore.collection("purchases")
-                    .add(purchase)
-                    .await()
+                    // Verificar si ya compró el item (evitar duplicados)
+                    if (currentItemsPurchased.contains(item.id)) {
+                        throw Exception("Ya tienes este artículo")
+                    }
+
+                    val newPoints = currentUserPoints - item.price
+                    val newItemsPurchased = currentItemsPurchased + item.id
+
+                    // Actualizar usuario
+                    transaction.update(userRef, mapOf(
+                        "points" to newPoints,
+                        "itemsPurchased" to newItemsPurchased
+                    ))
+
+                    // Registrar la compra
+                    val purchaseRef = firestore.collection("purchases").document()
+                    transaction.set(purchaseRef, mapOf(
+                        "userId" to currentUser.uid,
+                        "itemId" to item.id,
+                        "itemName" to item.name,
+                        "price" to item.price,
+                        "purchaseDate" to Timestamp.now()
+                    ))
+                }.await()
 
                 _purchaseResult.value = PurchaseResult.Success(item.name)
                 _purchaseConfirmation.value = null
 
             } catch (e: Exception) {
-                _purchaseResult.value = PurchaseResult.Error("Error al realizar la compra: ${e.message}")
+                _purchaseResult.value = PurchaseResult.Error("Error: ${e.message}")
             } finally {
                 _isLoading.value = false
             }

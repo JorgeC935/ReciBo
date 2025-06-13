@@ -311,16 +311,18 @@ fun QRCodeCard(
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Estado del QR
+                    // Reemplaza la lógica de estado del QR con:
                     val statusColor = when {
                         !qrCode.isActive -> Color.Red
-                        qrCode.scannedBy != null -> Color.Green
+                        qrCode.scannedBy != null && qrCode.isSingleUse -> Color.Gray
+                        qrCode.scannedBy != null && !qrCode.isSingleUse -> Color.Green
                         else -> Color.Blue
                     }
 
                     val statusText = when {
                         !qrCode.isActive -> "Cancelado"
-                        qrCode.scannedBy != null -> "Escaneado"
+                        qrCode.scannedBy != null && qrCode.isSingleUse -> "Usado"
+                        qrCode.scannedBy != null && !qrCode.isSingleUse -> "En uso múltiple"
                         else -> "Activo"
                     }
 

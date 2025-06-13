@@ -29,6 +29,7 @@ fun StoreScreen() {
     val isLoading by viewModel.isLoading.observeAsState(false)
     val purchaseResult by viewModel.purchaseResult.observeAsState()
     val purchaseConfirmation by viewModel.purchaseConfirmation.observeAsState()
+    val currentUser by viewModel.currentUser.observeAsState()
 
     // Manejar resultados de compra
     LaunchedEffect(purchaseResult) {
@@ -88,6 +89,7 @@ fun StoreScreen() {
                     StoreItemCard(
                         item = item,
                         userPoints = userPoints,
+                        itemsPurchased = currentUser?.itemsPurchased ?: emptyList(), // AGREGAR esta línea
                         onPurchaseClick = { viewModel.showPurchaseConfirmation(item) }
                     )
                 }
@@ -218,9 +220,11 @@ fun UserPointsHeader(userPoints: Int) {
 fun StoreItemCard(
     item: StoreItem,
     userPoints: Int,
+    itemsPurchased: List<String> = emptyList(),
     onPurchaseClick: () -> Unit
 ) {
     val canAfford = userPoints >= item.price
+    val alreadyPurchased = itemsPurchased.contains(item.id)
     val missingPoints = if (!canAfford) item.price - userPoints else 0
 
     Card(
@@ -278,18 +282,23 @@ fun StoreItemCard(
                 // Botón de compra
                 Button(
                     onClick = onPurchaseClick,
-                    enabled = canAfford,
+                    enabled = canAfford && !alreadyPurchased && item.stock != 0, // MODIFICAR esta línea
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (canAfford) Color(0xFFFFC107) else Color.Gray,
-                        contentColor = if (canAfford) Color.Black else Color.White
+                        containerColor = when {
+                            alreadyPurchased -> Color.Gray
+                            canAfford -> Color(0xFFFFC107)
+                            else -> Color.Gray
+                        },
+                        contentColor = if (canAfford && !alreadyPurchased) Color.Black else Color.White
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = if (canAfford) {
-                            "Comprar por ${item.price}"
-                        } else {
-                            "Faltan $missingPoints puntos"
+                        text = when {
+                            alreadyPurchased -> "Comprado"
+                            item.stock == 0 -> "Sin Stock"
+                            canAfford -> "Comprar"
+                            else -> "Faltan $missingPoints pts"
                         },
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold

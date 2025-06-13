@@ -1,6 +1,7 @@
 package com.example.recibo
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,8 +19,9 @@ import com.example.recibo.register.ui.RegisterScreen
 import com.example.recibo.qr.ui.ScannerScreen
 import com.example.recibo.qr.ui.CreatorScreen
 import com.example.recibo.store.ui.StoreScreen
-import com.example.recibo.challenge.ui.ChallengeScreen
+import com.example.recibo.achievement.ui.AchievementScreen
 import com.example.recibo.profile.ui.ProfileScreen
+import com.example.recibo.qr.ui.ScanResultScreen
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -27,6 +29,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             ReciBoTheme {
                 val navController = rememberNavController()
                 var showBars by remember { mutableStateOf(true) }
@@ -44,14 +47,14 @@ class MainActivity : ComponentActivity() {
 
                 Scaffold(
                     topBar = {
-                        if (showBars && currentRoute in listOf("mainmenu", "store", "challenge", "profile")) {
+                        if (showBars && currentRoute in listOf("mainmenu", "store", "achievement", "profile")) {
                             CenterAlignedTopAppBar(
                                 title = { Text("ReciBo") },
                                 actions = {
                                     IconButton(onClick = { navController.navigate("store") }) {
                                         Icon(Icons.Default.Store, contentDescription = "Tienda")
                                     }
-                                    IconButton(onClick = { navController.navigate("challenge") }) {
+                                    IconButton(onClick = { navController.navigate("achievement") }) {
                                         Icon(Icons.Default.EmojiEvents, contentDescription = "Desafíos")
                                     }
                                     IconButton(onClick = { navController.navigate("profile") }) {
@@ -62,7 +65,7 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     bottomBar = {
-                        if (showBars && currentRoute in listOf("mainmenu", "store", "challenge", "profile")) {
+                        if (showBars && currentRoute in listOf("mainmenu", "store", "achievement", "profile")) {
                             NavigationBar {
                                 NavigationBarItem(
                                     icon = { Icon(Icons.Default.QrCodeScanner, contentDescription = null) },
@@ -100,7 +103,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("mainmenu") { MainMenuScreen() }
                         composable("store") { StoreScreen() }
-                        composable("challenge") { ChallengeScreen() }
+                        composable("achievement") { AchievementScreen() }
                         composable("profile") {
                             ProfileScreen(
                                 onNavigateToLogin = {
@@ -111,10 +114,29 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("scanner") {
-                            ScannerScreen { navController.popBackStack() }
+                            ScannerScreen(
+                                onNavigateToResult = { pointsEarned, creatorName ->
+                                    navController.navigate("scanResult/$pointsEarned/$creatorName")
+                                },
+                                onBack = { navController.popBackStack() }
+                            )
                         }
                         composable("creator") {
                             CreatorScreen { navController.popBackStack() }
+                        }
+                        composable("scanResult/{pointsEarned}/{creatorName}") { backStackEntry ->
+                            val pointsEarned = backStackEntry.arguments?.getString("pointsEarned")?.toIntOrNull() ?: 0
+                            val creatorName = backStackEntry.arguments?.getString("creatorName") ?: ""
+
+                            ScanResultScreen(
+                                pointsEarned = pointsEarned,
+                                creatorName = creatorName,
+                                onNavigateToMainMenu = {
+                                    navController.navigate("mainmenu") {
+                                        popUpTo("mainmenu") { inclusive = true }
+                                    }
+                                }
+                            )
                         }
                     }
                 }

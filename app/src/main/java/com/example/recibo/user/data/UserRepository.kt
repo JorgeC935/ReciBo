@@ -146,4 +146,71 @@ class UserRepository {
             Result.failure(e)
         }
     }
+
+    // Agregar este método para validar transacciones de puntos
+    suspend fun validateAndUpdatePoints(fromUserId: String, toUserId: String, points: Int): Result<String> {
+        return try {
+            // Verificar que el usuario origen tenga suficientes puntos
+            val fromUserResult = getUser(fromUserId)
+            val fromUser = fromUserResult.getOrNull()
+
+            if (fromUser == null) {
+                return Result.failure(Exception("Usuario origen no encontrado"))
+            }
+
+            if (fromUser.points < points) {
+                return Result.failure(Exception("Puntos insuficientes"))
+            }
+
+            // Actualizar ambos usuarios
+            val newFromPoints = fromUser.points - points
+            updateUserPoints(fromUserId, newFromPoints)
+
+            val toUserResult = getUser(toUserId)
+            val toUser = toUserResult.getOrNull()
+            val newToPoints = (toUser?.points ?: 0) + points
+            updateUserPoints(toUserId, newToPoints)
+            updateTotalPointsEarned(toUserId, points)
+
+            Result.success("Puntos transferidos exitosamente")
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // AGREGAR al final de UserRepository.kt
+    suspend fun updateAchievementProgress(userId: String): Result<String> {
+        return try {
+            val userResult = getUser(userId)
+            val user = userResult.getOrNull() ?: return Result.failure(Exception("Usuario no encontrado"))
+
+            val achievementRepository = com.example.recibo.achievement.data.AchievementRepository()
+
+            // Obtener todos los logros
+            val achievements = achievementRepository.getAllAchievements().getOrNull() ?: emptyList()
+
+            achievements.forEach { achievement ->
+                val currentProgress = when (achievement.category) {
+                    "points" -> user.totalPointsEarned
+                    "scanner" -> user.totalReceipts
+                    "creator" -> 0 // Implementar si necesitas contar QRs creados
+                    else -> 0
+                }
+
+                if (currentProgress > 0) {
+                    // Actualizar progreso
+                    achievementRepository.updateUserAchievementProgress(userId, achievement.id, currentProgress)
+
+                    // Si se completó el logro, marcarlo como completado
+                    if (currentProgress >= achievement.requiredPoints) {
+                        achievementRepository.completeAchievement(userId, achievement.id)
+                    }
+                }
+            }
+
+            Result.success("Progreso de logros actualizado")
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

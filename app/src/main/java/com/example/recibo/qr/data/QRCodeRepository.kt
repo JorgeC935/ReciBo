@@ -74,4 +74,37 @@ class QRCodeRepository {
     suspend fun deactivateQRCode(id: String): Result<String> {
         return updateQRCode(id, mapOf("isActive" to false))
     }
+
+    // Agregar al final de QRCodeRepository.kt:
+
+    suspend fun cancelQRCodeAndRefund(qrCode: QRCode, userRepository: com.example.recibo.user.data.UserRepository): Result<String> {
+        return try {
+            // Primero verificar que el QR no ha sido escaneado
+            if (qrCode.scannedBy != null) {
+                return Result.failure(Exception("No se puede cancelar un QR que ya fue escaneado"))
+            }
+
+            // Desactivar el QR
+            val updateResult = deactivateQRCode(qrCode.id)
+            if (!updateResult.isSuccess) {
+                return Result.failure(Exception("Error al desactivar QR"))
+            }
+
+            // Devolver puntos al creador
+            val creatorResult = userRepository.getUser(qrCode.creatorId)
+            val creator = creatorResult.getOrNull()
+            if (creator != null) {
+                val newPoints = creator.points + qrCode.points
+                val refundResult = userRepository.updateUserPoints(qrCode.creatorId, newPoints)
+                if (!refundResult.isSuccess) {
+                    return Result.failure(Exception("Error al devolver puntos"))
+                }
+            }
+
+            Result.success("QR cancelado y puntos devueltos")
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
 }
