@@ -89,6 +89,10 @@ dependencies {
     // Coroutines para Firebase
     implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
+    implementation ("com.airbnb.android:lottie:6.1.0")
+    implementation ("com.airbnb.android:lottie-compose:6.1.0")
+    implementation("com.github.LottieFiles:dotlottie-android:0.4.1")
+
 }
 
 buildscript {
