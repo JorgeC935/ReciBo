@@ -134,15 +134,31 @@ class UserRepository {
         }
     }
 
+    // En UserRepository.kt - Reemplazar método updateTotalPointsEarned
     suspend fun updateTotalPointsEarned(uid: String, additionalPoints: Int): Result<String> {
         return try {
+            android.util.Log.d("UserRepository", "Actualizando puntos totales para usuario: $uid, puntos adicionales: $additionalPoints")
+
             val userDoc = usersCollection.document(uid).get().await()
             val user = userDoc.toObject(User::class.java)
-            user?.let {
-                val newTotal = it.totalPointsEarned + additionalPoints
-                updateUser(uid, mapOf("totalPointsEarned" to newTotal))
-            } ?: Result.failure(Exception("Usuario no encontrado"))
+
+            if (user != null) {
+                val newTotal = user.totalPointsEarned + additionalPoints
+                android.util.Log.d("UserRepository", "Puntos totales anteriores: ${user.totalPointsEarned}, nuevos: $newTotal")
+
+                val updateResult = updateUser(uid, mapOf("totalPointsEarned" to newTotal))
+                if (updateResult.isSuccess) {
+                    android.util.Log.d("UserRepository", "Puntos totales actualizados exitosamente")
+                } else {
+                    android.util.Log.e("UserRepository", "Error al actualizar puntos totales: ${updateResult.exceptionOrNull()?.message}")
+                }
+                updateResult
+            } else {
+                android.util.Log.e("UserRepository", "Usuario no encontrado para actualizar puntos totales")
+                Result.failure(Exception("Usuario no encontrado"))
+            }
         } catch (e: Exception) {
+            android.util.Log.e("UserRepository", "Excepción al actualizar puntos totales: ${e.message}", e)
             Result.failure(e)
         }
     }

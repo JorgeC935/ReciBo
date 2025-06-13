@@ -45,21 +45,27 @@ class ScannerViewModel : ViewModel() {
         }
     }
 
+    // ARCHIVO: ScannerViewModel.kt
+// UBICACIÓN: com/example/recibo/qr/ui/ScannerViewModel.kt
+// CAMBIOS: Reemplazar el método processReciboQR completo
+
     private fun processReciboQR(qrContent: String) {
         viewModelScope.launch {
             try {
+                android.util.Log.d("ScannerVM", "Procesando QR: $qrContent")
+
                 val qrResult = qrCodeRepository.getQRCode(qrContent)
                 if (qrResult.isSuccess) {
                     val qrCode = qrResult.getOrNull()
                     if (qrCode != null) {
+                        android.util.Log.d("ScannerVM", "QR encontrado: ${qrCode.id}, Puntos: ${qrCode.points}")
+
                         val currentUser = auth.currentUser
                         if (currentUser == null) {
                             android.util.Log.e("ScannerVM", "Usuario no autenticado")
                             _scanResult.value = ScanResult.Error("Usuario no autenticado")
                             return@launch
                         }
-
-                        android.util.Log.d("ScannerVM", "Usuario autenticado: ${currentUser.uid}")
 
                         // Validar que no es su propio QR
                         if (qrCode.creatorId == currentUser.uid) {
@@ -73,101 +79,136 @@ class ScannerViewModel : ViewModel() {
                             return@launch
                         }
 
-                        // Validar si ya fue escaneado por este usuario
-                        if (qrCode.scannedBy != null && qrCode.scannedBy == currentUser.uid) {
-                            _scanResult.value = ScanResult.Error("Ya has escaneado este QR anteriormente")
-                            return@launch
-                        }
-
-                        // Validar si es de uso único y ya fue escaneado
-                        if (qrCode.scannedBy != null && qrCode.isSingleUse) {
-                            _scanResult.value = ScanResult.Error("Este QR ya fue escaneado por otro usuario")
-                            return@launch
+                        // NUEVA LÓGICA: Validar según el tipo de QR
+                        if (qrCode.isSingleUse) {
+                            // QR de uso único: validar que no haya sido usado
+                            if (qrCode.scannedBy != null) {
+                                _scanResult.value = ScanResult.Error("Este QR de uso único ya fue utilizado")
+                                return@launch
+                            }
+                        } else {
+                            // QR de uso múltiple: validar que este usuario específico no lo haya usado
+                            if (qrCode.scannedBy == currentUser.uid) {
+                                _scanResult.value = ScanResult.Error("Ya has escaneado este QR anteriormente")
+                                return@launch
+                            }
                         }
 
                         // Procesar el escaneo exitoso
                         processSuccessfulScan(qrCode, currentUser.uid)
                     } else {
+                        android.util.Log.e("ScannerVM", "QR no encontrado en la base de datos")
                         _scanResult.value = ScanResult.Error("QR no encontrado")
                     }
                 } else {
+                    android.util.Log.e("ScannerVM", "Error al buscar QR: ${qrResult.exceptionOrNull()?.message}")
                     _scanResult.value = ScanResult.Error("Error al buscar QR: ${qrResult.exceptionOrNull()?.message}")
                 }
             } catch (e: Exception) {
+                android.util.Log.e("ScannerVM", "Excepción al procesar QR: ${e.message}", e)
                 _scanResult.value = ScanResult.Error("Error al procesar QR: ${e.message}")
             }
         }
     }
 
+    // CAMBIOS: Simplificar el método processSuccessfulScan para MVP
     private suspend fun processSuccessfulScan(qrCode: QRCode, scannerId: String) {
         try {
-            // Verificar si ya fue escaneado y es de uso único
-            if (qrCode.scannedBy != null && qrCode.isSingleUse) {
-                _scanResult.value = ScanResult.Error("Este QR ya fue escaneado")
-                return
-            }
-
-            // Obtener datos del escáner y del creador
+            // 1. Obtener datos actuales del usuario escaneador
             val scannerResult = userRepository.getUser(scannerId)
-            val scannerUser = scannerResult.getOrNull()
-            val scannerName = scannerUser?.name ?: "Usuario"
-            val scannerPoints = scannerUser?.points ?: 0
-
-            val creatorResult = userRepository.getUser(qrCode.creatorId)
-            val creatorUser = creatorResult.getOrNull()
-            val creatorPoints = creatorUser?.points ?: 0
-
-            // Verificar que el creador tenga suficientes puntos
-            if (creatorPoints < qrCode.points) {
-                _scanResult.value = ScanResult.Error("El creador no tiene suficientes puntos")
+            if (!scannerResult.isSuccess) {
+                android.util.Log.e("ScannerVM", "Error al obtener usuario escaneador: ${scannerResult.exceptionOrNull()?.message}")
+                _scanResult.value = ScanResult.Error("Error al obtener datos del usuario")
                 return
             }
 
-            // Actualizar puntos: sumar al escáner, restar al creador
-            val newScannerPoints = scannerPoints + qrCode.points
-            val newCreatorPoints = creatorPoints - qrCode.points
+            val scannerUser = scannerResult.getOrNull()
+            if (scannerUser == null) {
+                android.util.Log.e("ScannerVM", "Usuario escaneador no encontrado")
+                _scanResult.value = ScanResult.Error("Usuario no encontrado")
+                return
+            }
 
-            // Actualizar puntos del escáner
+            android.util.Log.d("ScannerVM", "Puntos actuales del escáner: ${scannerUser.points}")
+
+            // 2. Calcular nuevos puntos del escaneador
+            val newScannerPoints = scannerUser.points + qrCode.points
+            android.util.Log.d("ScannerVM", "Nuevos puntos del escáner: $newScannerPoints")
+
+            // 3. Actualizar puntos del escaneador
             val scannerUpdateResult = userRepository.updateUserPoints(scannerId, newScannerPoints)
             if (!scannerUpdateResult.isSuccess) {
+                android.util.Log.e("ScannerVM", "Error al actualizar puntos del escáner: ${scannerUpdateResult.exceptionOrNull()?.message}")
                 _scanResult.value = ScanResult.Error("Error al actualizar puntos del escáner")
                 return
             }
+            android.util.Log.d("ScannerVM", "✅ Puntos del escáner actualizados exitosamente")
 
-            // Actualizar puntos totales ganados del escáner
-            userRepository.updateTotalPointsEarned(scannerId, qrCode.points)
-            userRepository.updateAchievementProgress(scannerId)
-
-            // Restar puntos al creador
-            val creatorUpdateResult = userRepository.updateUserPoints(qrCode.creatorId, newCreatorPoints)
-            if (!creatorUpdateResult.isSuccess) {
-                _scanResult.value = ScanResult.Error("Error al actualizar puntos del creador")
-                return
+            // 4. Actualizar puntos totales ganados
+            val totalPointsResult = userRepository.updateTotalPointsEarned(scannerId, qrCode.points)
+            if (!totalPointsResult.isSuccess) {
+                android.util.Log.w("ScannerVM", "Advertencia: Error al actualizar puntos totales: ${totalPointsResult.exceptionOrNull()?.message}")
+                // No fallar por esto en el MVP
             }
 
-            // Actualizar QR como escaneado
-            val qrUpdates = mutableMapOf<String, Any>(
-                "scannedBy" to scannerId,
-                "scannedByName" to scannerName,
-                "scannedAt" to com.google.firebase.Timestamp.now()
-            )
+            // 5. Para MVP: Solo restar puntos al creador si tiene suficientes (opcional)
+            val creatorResult = userRepository.getUser(qrCode.creatorId)
+            if (creatorResult.isSuccess) {
+                val creatorUser = creatorResult.getOrNull()
+                if (creatorUser != null && creatorUser.points >= qrCode.points) {
+                    val newCreatorPoints = creatorUser.points - qrCode.points
+                    val creatorUpdateResult = userRepository.updateUserPoints(qrCode.creatorId, newCreatorPoints)
+                    if (creatorUpdateResult.isSuccess) {
+                        android.util.Log.d("ScannerVM", "✅ Puntos del creador actualizados")
+                    } else {
+                        android.util.Log.w("ScannerVM", "Advertencia: No se pudieron restar puntos al creador")
+                    }
+                } else {
+                    android.util.Log.w("ScannerVM", "Advertencia: Creador no tiene suficientes puntos, continuando...")
+                }
+            }
 
-            // Si es de uso único, desactivarlo
+            // 6. NUEVA LÓGICA: Actualizar QR según su tipo
+            val qrUpdates = mutableMapOf<String, Any>()
+
             if (qrCode.isSingleUse) {
+                // QR de uso único: marcar como escaneado y desactivar
+                qrUpdates["scannedBy"] = scannerId
+                qrUpdates["scannedByName"] = scannerUser.name
+                qrUpdates["scannedAt"] = com.google.firebase.Timestamp.now()
                 qrUpdates["isActive"] = false
+                android.util.Log.d("ScannerVM", "QR de uso único marcado como usado y desactivado")
+            } else {
+                // QR de uso múltiple: solo registrar el último escaneador
+                qrUpdates["scannedBy"] = scannerId
+                qrUpdates["scannedByName"] = scannerUser.name
+                qrUpdates["scannedAt"] = com.google.firebase.Timestamp.now()
+                // NO desactivar el QR para permitir múltiples usos
+                android.util.Log.d("ScannerVM", "QR de uso múltiple actualizado, permanece activo")
             }
 
             val qrUpdateResult = qrCodeRepository.updateQRCode(qrCode.id, qrUpdates)
             if (!qrUpdateResult.isSuccess) {
-                _scanResult.value = ScanResult.Error("Error al actualizar QR")
-                return
+                android.util.Log.w("ScannerVM", "Advertencia: Error al actualizar QR: ${qrUpdateResult.exceptionOrNull()?.message}")
+                // No fallar por esto en el MVP, los puntos ya se otorgaron
+            } else {
+                android.util.Log.d("ScannerVM", "✅ QR actualizado exitosamente")
             }
 
+            // 7. Actualizar progreso de logros (opcional para MVP)
+            try {
+                userRepository.updateAchievementProgress(scannerId)
+            } catch (e: Exception) {
+                android.util.Log.w("ScannerVM", "Advertencia: Error al actualizar logros: ${e.message}")
+            }
+
+            // 8. ¡ÉXITO!
+            android.util.Log.d("ScannerVM", "=== PROCESO COMPLETADO EXITOSAMENTE ===")
             _scanResult.value = ScanResult.Success(qrCode.points, qrCode.creatorName)
-            userRepository.updateAchievementProgress(scannerId)
 
         } catch (e: Exception) {
-            _scanResult.value = ScanResult.Error("Error al procesar escaneo: ${e.message}")
+            android.util.Log.e("ScannerVM", "Excepción crítica en processSuccessfulScan: ${e.message}", e)
+            _scanResult.value = ScanResult.Error("Error crítico al procesar escaneo: ${e.message}")
         }
     }
 

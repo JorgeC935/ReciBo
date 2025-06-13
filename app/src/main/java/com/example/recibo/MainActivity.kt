@@ -11,7 +11,9 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
 import androidx.navigation.compose.*
+import androidx.navigation.navArgument
 import com.example.recibo.ui.theme.ReciBoTheme
 import com.example.recibo.mainmenu.ui.MainMenuScreen
 import com.example.recibo.login.ui.LoginScreen
@@ -137,8 +139,14 @@ class MainActivity : ComponentActivity() {
                         composable("creator") {
                             CreatorScreen { navController.popBackStack() }
                         }
-                        composable("scanResult/{pointsEarned}/{creatorName}") { backStackEntry ->
-                            val pointsEarned = backStackEntry.arguments?.getString("pointsEarned")?.toIntOrNull() ?: 0
+                        composable(
+                            "scanResult/{pointsEarned}/{creatorName}",
+                            arguments = listOf(
+                                navArgument("pointsEarned") { type = NavType.IntType },
+                                navArgument("creatorName") { type = NavType.StringType }
+                            )
+                        ) { backStackEntry ->
+                            val pointsEarned = backStackEntry.arguments?.getInt("pointsEarned") ?: 0
                             val creatorName = backStackEntry.arguments?.getString("creatorName") ?: ""
 
                             ScanResultScreen(
